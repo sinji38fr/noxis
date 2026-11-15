@@ -1,0 +1,16 @@
+node_modules/
+.tools/
+.env
+.env.*
+!.env.example
+data/
+cache/
+secrets/
+*.mp4
+*.flv
+*.h264
+*.h265
+*.raw
+*.log
+*.key
+*.pem

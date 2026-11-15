@@ -1,0 +1,15 @@
+.git
+node_modules
+.tools
+.env
+.env.*
+data
+cache
+secrets
+work
+*.mp4
+*.flv
+*.raw
+*.log
+*.key
+*.pem

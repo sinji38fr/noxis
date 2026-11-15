@@ -1,0 +1,1 @@
+{"name":"@noxis/ip-compat","version":"3.0.0","main":"index.cjs","license":"MIT","description":"Minimal IP peer equality compatibility for ftp-srv, backed by node:net"}
