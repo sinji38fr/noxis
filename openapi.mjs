@@ -20,5 +20,5 @@ export function openapi(basePath=''){
   '/api/exports/{id}/file':{get:{...op('Download a prepared MP4, supporting byte ranges',{params:[id]}),responses:{'200':{description:'MP4',content:{'video/mp4':{schema:{type:'string',format:'binary'}}}},'206':{description:'MP4 byte range'},'409':{description:'Not ready'}}}},
   '/api/live':{post:{...op('Live concatenated JPEG images, 5 fps, without audio',{body:{type:'object',required:['channel'],properties:{channel:{type:'integer',minimum:1},stream:{enum:[0,1]}}}}),responses:{'200':{description:'Concatenated JPEG stream',content:{'application/octet-stream':{schema:{type:'string',format:'binary'}}}}}}}
  };
- return {openapi:'3.0.3',info:{title:'Noxis',version:'1.2.0',description:'Local NVR media gateway. Bearer token is server-side only. A monitor token is restricted to GET /api/status and /api/cameras.'},servers:[{url:basePath||'/'}],components:{securitySchemes:{bearerAuth:{type:'http',scheme:'bearer'}}},paths};
+ return {openapi:'3.0.3',info:{title:'Noxis',version:'1.2.1',description:'Local NVR media gateway. Bearer token is server-side only. A monitor token is restricted to GET /api/status and /api/cameras.'},servers:[{url:basePath||'/'}],components:{securitySchemes:{bearerAuth:{type:'http',scheme:'bearer'}}},paths};
 }

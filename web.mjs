@@ -2,6 +2,7 @@ import {takeSnapshot} from './snapshot.mjs';
 import {cameras,renameCamera} from './cameras.mjs';
 import {nvrStatus} from './nvr.mjs';
 import {openapi} from './openapi.mjs';
+import {hostAllowed} from './hosts.mjs';
 import http from 'node:http';
 import {randomBytes,timingSafeEqual,createHash} from 'node:crypto';
 import {readFile,stat} from 'node:fs/promises';
@@ -41,12 +42,12 @@ export function createApp({basePath=config.basePath,publicUrl=config.publicUrl,m
   res.setHeader('Cache-Control','no-store');res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Referrer-Policy','no-referrer');res.setHeader('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' blob:; media-src 'self' blob:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'");
   const json=(status,data)=>{if(res.destroyed||res.headersSent)return;res.writeHead(status,{'Content-Type':'application/json; charset=utf-8'});res.end(JSON.stringify(data));};
   try{
-   const hostname=String(req.headers.host||'').replace(/:\d+$/,'').toLowerCase();if(!config.allowedHosts.includes(hostname)&&hostname!==publicAddress?.hostname)throw failure('Host not allowed. Configure ALLOWED_HOSTS.',403,'HOST');
+   if(!hostAllowed(req.headers.host,config.allowedHosts,publicAddress?.hostname))throw failure('Host not allowed. Configure ALLOWED_HOSTS.',403,'HOST');
    const url=new URL(req.url,'http://'+req.headers.host);
    if(basePath&&url.pathname===basePath&&req.method==='GET'){res.writeHead(308,{Location:basePath+'/'+url.search});return res.end();}
    if(basePath){if(!url.pathname.startsWith(basePath+'/'))throw failure('Not found.',404,'NOT_FOUND');url.pathname=url.pathname.slice(basePath.length);}
    if(req.method==='GET'&&url.pathname==='/openapi.json')return json(200,openapi(basePath));
-   if(req.method==='GET'&&url.pathname==='/healthz')return json(200,{ok:true,name:'Noxis',version:'1.2.0'});
+   if(req.method==='GET'&&url.pathname==='/healthz')return json(200,{ok:true,name:'Noxis',version:'1.2.1'});
    if(req.method==='GET'&&['/','/app.js','/style.css'].includes(url.pathname)){const file=url.pathname==='/'?'index.html':url.pathname.slice(1);res.setHeader('Content-Type',file.endsWith('.html')?'text/html; charset=utf-8':file.endsWith('.js')?'text/javascript; charset=utf-8':'text/css; charset=utf-8');let content=await readFile(path.join(root,file),'utf8');if(file==='index.html')content=content.replace('<head>',`<head><meta name="noxis-base" content="${basePath}">`).replace('href="/"',`href="${basePath}/"`).replace('href="/style.css"',`href="${basePath}/style.css"`).replace('src="/app.js"',`src="${basePath}/app.js"`);return res.end(content);}
    if(req.method==='GET'&&url.pathname==='/api/config')return json(200,{configured:configured(),channels:config.channels,host:config.host,archiveDays:config.archiveDays,dates:virtualDates(),ftpEnabled:process.env.FTP_ENABLED==='true',basePath,publicUrl});
    const apiToken=tokenMatches(req.headers.authorization);const monitorToken=!!config.monitorToken&&typeof req.headers.authorization==='string'&&req.headers.authorization.length===('Bearer '+config.monitorToken).length&&timingSafeEqual(Buffer.from(req.headers.authorization),Buffer.from('Bearer '+config.monitorToken));

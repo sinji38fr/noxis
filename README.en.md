@@ -88,3 +88,7 @@ Noxis exposes single JPEG snapshots per channel, shared camera names and `/opena
 Compose mounts the `noxis-data` volume at `/data`. Interrupted exports restart from the beginning after a restart, retaining their IDs; ready media remains available until the 30-minute idle cache expires. Preserve the volume and NVR settings on upgrades. `NOXIS_DATA_VOLUME` selects another volume name. Camera names are stored server-side and available to ARCADIA.
 
 ARCADIA enforces per-user, per-camera permissions and keeps the Noxis token server-side. Archive media flows directly between Noxis and ARCADIA. Existing native RTSP relays keep their role; the Noxis live view is still JPEG without audio. See [API.md](API.md).
+
+`ALLOWED_HOSTS` supports exact hosts, IPv4 prefixes such as `192.168.*` or `192.168.1.*`, and an explicit `*` to accept any valid host. This matches the HTTP Host header, not the client’s IP address, and does not replace authentication.
+
+`FTP_PASV_ADDRESS` is the address advertised to FTP clients for data connections. Use the server LAN address for clients on another machine and expose the FTP ports on a reachable interface; Compose defaults to loopback-only bindings.

@@ -132,3 +132,7 @@ Noxis fournit maintenant une photo JPEG unique par canal, un catalogue de camér
 Compose monte le volume `noxis-data` dans `/data`. Les préparations interrompues sont reprises depuis leur début après redémarrage et les fichiers prêts sont récupérés tant que le cache n’a pas expiré. Garder ce volume et les mêmes paramètres NVR lors des mises à jour. `NOXIS_DATA_VOLUME` permet de nommer un autre volume. Les noms donnés aux caméras sont enregistrés côté serveur et deviennent utilisables par ARCADIA.
 
 ARCADIA est responsable des permissions par utilisateur et par caméra ; son navigateur ne reçoit pas le jeton Noxis. Les archives passent directement de Noxis à ARCADIA, sans relais vidéo dans Monitoring. Le direct Noxis reste une vue JPEG sans audio ; les relais RTSP natifs existants conservent leur rôle. Les routes et paramètres sont décrits dans [API.md](API.md).
+
+`ALLOWED_HOSTS` accepte des hôtes exacts, un préfixe IPv4 comme `192.168.*` ou `192.168.1.*`, et `*` pour accepter tout hôte valide. Exemple LAN : `localhost,127.0.0.1,noxis,192.168.*`. Ce réglage concerne l’en-tête HTTP Host ; il ne filtre pas les adresses des visiteurs et ne remplace pas l’authentification.
+
+`FTP_PASV_ADDRESS` est l’adresse annoncée au client FTP pour sa connexion de données. Utiliser l’adresse LAN du serveur pour un client situé sur une autre machine. Les ports FTP doivent aussi être publiés sur une interface accessible à ce client ; le Compose par défaut reste lié à localhost.

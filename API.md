@@ -85,3 +85,5 @@ Errors use `{ "error": "message", "code": "ERROR_CODE" }` with an appropriate HT
 A snapshot has a 15-second deadline and at most two simultaneous captures. Its connection and decoder close after the first complete JPEG. It does not wait behind archive exports.
 
 Avec `NOXIS_DATA_DIR=/data` et un volume conservé, les noms des caméras et les métadonnées des tâches sont persistants. Après redémarrage, les préparations interrompues sont relancées depuis leur début avec le même identifiant ; les fichiers prêts restent disponibles dans la limite du cache de 30 minutes d’inactivité. La reprise attend une reconnexion au NVR et est retentée périodiquement. Aucun identifiant NVR n’est écrit dans ces métadonnées. Sans répertoire de données, le fonctionnement reste en mémoire. Le cache ne remplace pas une sauvegarde durable des archives.
+
+Host matching accepts exact hosts, IPv4 prefixes (`192.168.*`, `192.168.1.*`), or an explicit `*` in `ALLOWED_HOSTS`. This selects accepted HTTP Host values, not visitor IPs.
