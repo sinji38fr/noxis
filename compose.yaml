@@ -14,7 +14,11 @@ services:
       NVR_VIDEO_PORT: ${NVR_VIDEO_PORT:-10000}
       NVR_USERNAME: ${NVR_USERNAME:-admin}
       NVR_PASSWORD: ${NVR_PASSWORD:?Set NVR_PASSWORD in .env}
+      EXPORT_CONCURRENCY: ${EXPORT_CONCURRENCY:-1}
       ARCHIVE_DAYS: ${ARCHIVE_DAYS:-30}
+      # Optional reverse-proxy URI, for example https://home.example/noxis/
+      PUBLIC_URL: ${PUBLIC_URL:-}
+      BASE_PATH: ${BASE_PATH:-}
       # Optional number of tiles in the live view, not used to create FTP folders.
       NVR_CHANNELS: ${NVR_CHANNELS:-4}
       FTP_ENABLED: ${FTP_ENABLED:-true}

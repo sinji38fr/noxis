@@ -1,3 +1,4 @@
+import {archiveFilename} from './filenames.mjs';
 import FtpSrv from 'ftp-srv';
 import path from 'node:path';
 import {PassThrough} from 'node:stream';
@@ -7,8 +8,7 @@ import {timingSafeEqual} from 'node:crypto';
 import {config,virtualDates} from './config.mjs';
 const quiet={trace(){},debug(){},info(){},warn(){},error(){},fatal(){},child(){return this;}};
 const same=(a,b)=>{const x=Buffer.from(a||''),y=Buffer.from(b||'');return x.length===y.length&&timingSafeEqual(x,y);};
-const hhmmss=seconds=>{const d=new Date(seconds*1000);return [d.getHours(),d.getMinutes(),d.getSeconds()].map(v=>String(v).padStart(2,'0')).join('-');};
-export const ftpFilename=r=>`Cam${String(r.channel).padStart(2,'0')}_${hhmmss(r.start)}_${hhmmss(r.end)}_${r.id.slice(0,8)}.mp4`;
+export const ftpFilename=r=>archiveFilename(r,'_'+r.id.slice(0,8));
 export function ftpEntries(rows){return rows.flatMap(record=>{const result=[];for(let start=record.start;start<record.end;start+=3600)result.push({...record,start,end:Math.min(record.end,start+3600)});return result;});}
 const fileStat=(name,directory,date,size=0)=>({name,size,mtime:new Date(date),atime:new Date(date),ctime:new Date(date),mode:directory?0o40555:0o100444,uid:0,gid:0,nlink:1,isDirectory:()=>directory,isFile:()=>!directory,isSymbolicLink:()=>false});
 export class VirtualArchiveFS{

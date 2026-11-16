@@ -14,7 +14,29 @@ docker compose up -d
 
 Ouvrir **http://localhost:8787**. L’adresse du NVR et ses identifiants sont fournis par Compose : aucun écran de connexion n’est affiché quand ils sont configurés. L’image ne contient ni adresse réelle ni identifiant de NVR. Ne pas committer `.env`.
 
-Image publique : `shinji38fr/noxis:latest` et `shinji38fr/noxis:1.0.0`.
+Image publique : `shinji38fr/noxis:latest` et `shinji38fr/noxis:1.1.0`.
+
+## URI configurable et reverse proxy
+
+`PUBLIC_URL` définit l’adresse complète de l’application et `BASE_PATH` son éventuel préfixe. Exemple dans `.env` :
+
+```dotenv
+PUBLIC_URL=https://maison.example/noxis/
+BASE_PATH=/noxis
+```
+
+Le préfixe peut aussi être déduit de `PUBLIC_URL`. Laisser les deux valeurs vides pour un accès direct à la racine. Les ressources, API, cookies, fichiers et flux utilisent tous ce préfixe. Avec un reverse proxy, **conserver le préfixe dans la requête transmise** : Noxis gère lui-même `/noxis/`. Le contrôle de santé Docker s’adapte au préfixe. Exemple Nginx :
+
+```nginx
+location /noxis/ {
+    proxy_pass http://127.0.0.1:8787;
+    proxy_set_header Host $host;
+    proxy_buffering off;
+    proxy_read_timeout 2h;
+}
+```
+
+Ne pas ajouter de `/` après le port de `proxy_pass`, afin de conserver le chemin. L’hôte de `PUBLIC_URL` est automatiquement autorisé ; les éventuels autres accès se configurent avec `ALLOWED_HOSTS`.
 
 Le Compose fourni publie les ports uniquement sur la machine locale. Pour utiliser un autre PC du LAN, adapter les adresses de publication, `ALLOWED_HOSTS` et `FTP_PASV_ADDRESS` à l’adresse LAN du serveur Docker. Le navigateur n’a pas besoin de joindre directement le NVR : c’est le conteneur qui doit pouvoir atteindre son port HTTP et son port vidéo.
 
@@ -22,6 +44,7 @@ Le Compose fourni publie les ports uniquement sur la machine locale. Pour utilis
 
 - **Direct** : jusqu’à quatre caméras simultanées pour identifier les canaux, H.264 ou H.265 décodé côté serveur, affichage JPEG à 5 images/s. Ce mode d’identification est sans audio. Les flux sont fermés en quittant la vue ou en masquant la page.
 - **Archives** : date, horaires, canal, type d’événement, pagination et export CSV. « Tout ce jour » rassemble les résultats d’une journée.
+- **Téléchargement de la sélection** : cocher les vidéos voulues puis « Télécharger la sélection (N) ». La case d’en-tête sélectionne uniquement la page affichée ; la sélection peut couvrir plusieurs pages. Aucun résultat non coché n’est ajouté à la file. Les MP4 sont préparés deux par deux, sans ZIP. Le navigateur propose un dossier lorsque cette fonction est disponible ; sinon, autoriser les téléchargements multiples. Garder la page ouverte pour l’enregistrement automatique des fichiers.
 - **MP4** : les images H.264/H.265 sont copiées sans réencodage pour le téléchargement. L’audio G711A/G711U 8 kHz mono est converti en AAC. La lecture navigateur propose un extrait ; H.265 est alors converti en H.264 pour la compatibilité.
 - **Téléchargements** : tâches avec progression, annulation et cache temporaire. Deux préparations simultanées, au plus une heure ou 1 Go de vidéo par extrait. Un export peut prendre approximativement la durée de lecture demandée ; sa progression reste visible. Le cache est supprimé après 30 minutes d’inactivité ou à l’arrêt du conteneur.
 - **Informations** : consultation du NVR, sans modification de configuration.
@@ -66,6 +89,7 @@ mirror --only-missing --parallel=1 --no-perms /2026-01-31 ./archives/2026-01-31
 | `NVR_USERNAME` / `NVR_PASSWORD` | Identifiants injectés au conteneur, jamais renvoyés au navigateur |
 | `NVR_PASSWORD_FILE` | Alternative : chemin vers un secret Docker ; prioritaire sur `NVR_PASSWORD` |
 | `ARCHIVE_DAYS` | Nombre de dates virtuelles, de 1 à 3660 ; défaut 30 |
+| `PUBLIC_URL` / `BASE_PATH` | URI publique complète et préfixe du reverse proxy, facultatifs |
 | `NVR_CHANNELS` | Nombre de canaux interrogés/affichés ; défaut 4, optionnel pour une installation à 4 caméras |
 | `FTP_ENABLED` | Active le FTP si `true` |
 | `FTP_USERNAME` / `FTP_PASSWORD` | Compte FTP local séparé |
@@ -97,3 +121,5 @@ Noxis a une couche de protocole dédiée. La compatibilité n’est pas garantie
 ## Licence
 
 Code Noxis : MIT. FFmpeg et les dépendances conservent leurs licences respectives ; FFmpeg est invoqué comme processus séparé. Sources : [FFmpeg](https://ffmpeg.org/), [ftp-srv](https://github.com/QuorumDMS/ftp-srv).
+
+Les filtres Archives permettent de cocher plusieurs caméras. Les exports utilisent des noms lisibles comme `Cam02_2026-10-31_19-00-00_19-10-25.mp4` (fuseau `TZ`). Après une sauvegarde automatique dans le dossier choisi, Noxis affiche « Enregistré dans le dossier ». `EXPORT_CONCURRENCY=1` limite par défaut les préparations simultanées à une ; ce réglage est configurable de 1 à 8 dans Compose.

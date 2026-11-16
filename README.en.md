@@ -14,7 +14,11 @@ docker compose up -d
 
 Open **http://localhost:8787**. Compose provides the NVR address and credentials, so the login screen is hidden when credentials are configured. No real device address, password or private recording is embedded in the image. Never commit `.env`.
 
-Public image: `shinji38fr/noxis:latest` / `shinji38fr/noxis:1.0.0`.
+Public image: `shinji38fr/noxis:latest` / `shinji38fr/noxis:1.1.0`.
+
+## Configurable URI and reverse proxy
+
+Set `PUBLIC_URL=https://home.example/noxis/` and optionally `BASE_PATH=/noxis`. The prefix can be derived from the public URL; leave both empty for a root installation. Resources, API calls, cookies, downloads, live streams and health checks respect the prefix. Your proxy must **preserve the prefix** when forwarding requests. For Nginx, use `proxy_pass http://127.0.0.1:8787;` inside `location /noxis/`, without a trailing slash; forward the Host header, disable response buffering and allow a long read timeout. The public URL hostname is automatically allowed; configure other hostnames with `ALLOWED_HOSTS`.
 
 The supplied Compose file publishes ports on loopback only. For another LAN client, adjust published addresses, `ALLOWED_HOSTS` and `FTP_PASV_ADDRESS` to the Docker host's LAN address. The container must reach the NVR's HTTP and video ports; the browser does not connect to the NVR directly.
 
@@ -22,6 +26,7 @@ The supplied Compose file publishes ports on loopback only. For another LAN clie
 
 - Live identification mosaic: up to four H.264/H.265 cameras, server-side decoding, JPEG display at 5 fps. Live view has no audio; archive audio is preserved through AAC conversion.
 - Archive filters, pagination, daily listing, CSV and camera names.
+- Checked recordings only: use row checkboxes and **Download selected (N)**. The header checkbox selects the current page; selections can span pages. No unchecked recording is enqueued. Two MP4 files are prepared at a time, without a ZIP. A destination folder is offered when supported; otherwise, allow multiple browser downloads. Keep the page open for automatic saving.
 - MP4 downloads copy H.264/H.265 video without re-encoding; mono 8 kHz G711A/G711U audio is converted to AAC. Browser playback converts H.265 to H.264 for compatibility.
 - Export jobs, progress and cancellation. Two concurrent preparations; up to one hour or 1 GB of video per export. Retrieval may take approximately the recording's duration. Cached files expire after 30 idle minutes and do not survive container replacement.
 - Read-only NVR information. No root access or destructive device operations.
@@ -72,3 +77,5 @@ npm start
 `FFMPEG_PATH` can point to an installed FFmpeg executable. Device credentials are kept in process memory, not returned to the UI. Temporary files contain prepared media only. The local server binds to loopback; the Docker container binds internally to all interfaces.
 
 Compatibility depends on the NVR firmware. No vendor JavaScript files are needed at runtime. Noxis code is MIT licensed; FFmpeg and dependencies retain their own licenses. [FFmpeg](https://ffmpeg.org/) · [ftp-srv](https://github.com/QuorumDMS/ftp-srv).
+
+Archive filters support multiple camera checkboxes. Exports use readable filenames such as `Cam02_2026-10-31_19-00-00_19-10-25.mp4` (using `TZ`). Completed automatic folder saves show “Saved to folder”. `EXPORT_CONCURRENCY=1` defaults to one simultaneous preparation; Compose accepts values from 1 to 8.

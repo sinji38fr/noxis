@@ -31,7 +31,7 @@ export function captureReplay({username,password,channel,start,end,type,host='12
    else if(stage==='media'&&frames===0&&now-startedAt>25000)finish(new Error('Aucune image reçue pour cet enregistrement.'));
    else if(frames>0&&now-lastMedia>10000)finish(mode==='replay'&&nearReplayEnd(firstTs,lastTs,start,end)?undefined:new Error('Le flux s’est interrompu avant la fin. Essaie un extrait plus court.'));
    else if(mode==='live'&&maxLiveSeconds&&frames>0&&now-startedAt>=maxLiveSeconds*1000)finish();
-   else if(mode==='replay'&&now-startedAt>Math.min(3630000,Math.max(60000,(end-start+30)*1000)))finish(new Error('Le téléchargement a dépassé le délai autorisé.'));
+   else if(mode==='replay'&&now-startedAt>Math.min(7200000,Math.max(120000,(end-start)*2000+120000)))finish(new Error('Le téléchargement a dépassé le délai autorisé.'));
   },500);
   try{
    const auth=Buffer.concat([encryptField(username),encryptField(password)]);

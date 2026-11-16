@@ -2,6 +2,8 @@
 
 Base URL: `http://localhost:8787`. JSON uses stable English field names.
 
+With `BASE_PATH=/noxis`, the base URL is `http://localhost:8787/noxis`; every route below is relative to it. / Avec un préfixe configuré, ajouter celui-ci à toutes les routes.
+
 For external clients, configure `NOXIS_API_TOKEN` and send `Authorization: Bearer YOUR_TOKEN`. NVR credentials stay in Docker. Browser requests instead use an HTTP-only session cookie; state-changing requests must send the exact `Origin` and `X-Noxis-Client: 1` headers. No CORS access is enabled.
 
 Pour un client externe, configurer `NOXIS_API_TOKEN` puis transmettre ce jeton dans l’en-tête Bearer. Les identifiants du NVR ne figurent ni dans les URL ni dans les réponses.
@@ -17,6 +19,8 @@ Pour un client externe, configurer `NOXIS_API_TOKEN` puis transmettre ce jeton d
 | GET | `/api/recordings?date=YYYY-MM-DD` | All camera recordings for a day, queried lazily |
 | POST | `/api/search` | Filtered/paginated archive search |
 | POST | `/api/exports` | Start or reuse an export; responds 202 with job state |
+| GET | `/api/exports` | List exports belonging to the authenticated client |
+| POST | `/api/exports/batch` | Enqueue only explicit `recordIds`; separate MP4 files, no ZIP |
 | GET | `/api/exports/:id` | Progress, codec, audio, size and state |
 | POST | `/api/exports/:id/cancel` | Cancel preparation |
 | GET | `/api/exports/:id/file` | Download ready MP4; supports HTTP byte ranges |
@@ -58,6 +62,8 @@ First query a day or run a search so its record IDs are available to your authen
 
 `offset` / `duration` are seconds. Maximum duration is 3600 seconds. `browser:false` copies original H.264/H.265 video; `browser:true` converts H.265 to H.264 for browser compatibility. Audio is AAC in either case. Poll the returned job ID every two seconds; download only after `state` becomes `ready`.
 
-États : `capturing`, `assembling`, `ready`, `error`, `cancelled`. Les identifiants des tâches sont limités au client authentifié. Les fichiers disparaissent après expiration du cache : recréer une tâche si nécessaire. La liste des dates ne génère aucun export ; seuls les téléchargements créent des médias temporaires.
+États : `queued`, `capturing`, `assembling`, `ready`, `error`, `cancelled`. Les identifiants des tâches sont limités au client authentifié. Les fichiers disparaissent après expiration du cache : recréer une tâche si nécessaire. La liste des dates ne génère aucun export ; seuls les téléchargements créent des médias temporaires.
+
+Batch request / Requête groupée : `{"recordIds":["first-selected-id","second-selected-id"]}`. Only these records are enqueued; there is no automatic selection of a page, day or search result. Two preparations run concurrently, with a bounded queue of 5000 entries. Recordings longer than one hour are split into consecutive export jobs. / Seuls les identifiants explicitement fournis sont traités, jamais les vidéos non cochées.
 
 Errors use `{ "error": "message", "code": "ERROR_CODE" }` with an appropriate HTTP status. Codes include `LOGIN_REQUIRED`, `NVR_AUTH`, `NVR_UNREACHABLE`, `DATE_RANGE`, `EXPORT_BUSY`, `EXPORT_RANGE` and `NOT_FOUND`.
