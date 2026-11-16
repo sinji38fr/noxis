@@ -1,5 +1,9 @@
+import {takeSnapshot} from './snapshot.mjs';
+import {cameras,renameCamera} from './cameras.mjs';
+import {nvrStatus} from './nvr.mjs';
+import {openapi} from './openapi.mjs';
 import http from 'node:http';
-import {randomBytes,timingSafeEqual} from 'node:crypto';
+import {randomBytes,timingSafeEqual,createHash} from 'node:crypto';
 import {readFile,stat} from 'node:fs/promises';
 import {createReadStream} from 'node:fs';
 import {pipeline} from 'node:stream/promises';
@@ -17,7 +21,7 @@ export async function getConfiguredClient(){
  if(!configured())throw failure('Docker NVR credentials are not configured.',401,'LOGIN_REQUIRED');
  if(configuredClient&&configuredClient.validUntil>Date.now())return configuredClient;
  if(loginPending)return loginPending;
- loginPending=(async()=>{const c=await credentials();const client=configuredClient&&configuredClient.username===c.username&&configuredClient.password===c.password?configuredClient:new NvrClient(c.username,c.password);await client.login();client.validUntil=Date.now()+25*60000;configuredClient=client;return client;})();
+ loginPending=(async()=>{const c=await credentials();const client=configuredClient&&configuredClient.username===c.username&&configuredClient.password===c.password?configuredClient:new NvrClient(c.username,c.password);await client.login();client.uid=createHash('sha256').update(client.target+'|'+client.username).digest('hex');client.persistent=true;await exportsManager.recover(client);client.validUntil=Date.now()+25*60000;configuredClient=client;return client;})();
  try{return await loginPending;}finally{loginPending=null;}
 }
 function tokenMatches(value){if(!config.apiToken||!value)return false;const a=Buffer.from(value),b=Buffer.from('Bearer '+config.apiToken);return a.length===b.length&&timingSafeEqual(a,b);}
@@ -31,7 +35,7 @@ export function validateSearch(q){
 }
 export function createApp({basePath=config.basePath,publicUrl=config.publicUrl,manager=exportsManager,clientProvider=getConfiguredClient}={}){
  const publicAddress=publicUrl?new URL(publicUrl):null;
- const sessions=new Map(),streams=new Set();
+ const sessions=new Map(),streams=new Set();let snapshots=0;
  const timer=setInterval(()=>{for(const [id,s]of sessions)if(s.expires<Date.now()){for(const c of s.streams)c.abort();sessions.delete(id);}},15000);timer.unref();
  const app=http.createServer(async(req,res)=>{
   res.setHeader('Cache-Control','no-store');res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Referrer-Policy','no-referrer');res.setHeader('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' blob:; media-src 'self' blob:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'");
@@ -41,10 +45,12 @@ export function createApp({basePath=config.basePath,publicUrl=config.publicUrl,m
    const url=new URL(req.url,'http://'+req.headers.host);
    if(basePath&&url.pathname===basePath&&req.method==='GET'){res.writeHead(308,{Location:basePath+'/'+url.search});return res.end();}
    if(basePath){if(!url.pathname.startsWith(basePath+'/'))throw failure('Not found.',404,'NOT_FOUND');url.pathname=url.pathname.slice(basePath.length);}
-   if(req.method==='GET'&&url.pathname==='/healthz')return json(200,{ok:true,name:'Noxis',version:'1.1.0'});
+   if(req.method==='GET'&&url.pathname==='/openapi.json')return json(200,openapi(basePath));
+   if(req.method==='GET'&&url.pathname==='/healthz')return json(200,{ok:true,name:'Noxis',version:'1.2.0'});
    if(req.method==='GET'&&['/','/app.js','/style.css'].includes(url.pathname)){const file=url.pathname==='/'?'index.html':url.pathname.slice(1);res.setHeader('Content-Type',file.endsWith('.html')?'text/html; charset=utf-8':file.endsWith('.js')?'text/javascript; charset=utf-8':'text/css; charset=utf-8');let content=await readFile(path.join(root,file),'utf8');if(file==='index.html')content=content.replace('<head>',`<head><meta name="noxis-base" content="${basePath}">`).replace('href="/"',`href="${basePath}/"`).replace('href="/style.css"',`href="${basePath}/style.css"`).replace('src="/app.js"',`src="${basePath}/app.js"`);return res.end(content);}
    if(req.method==='GET'&&url.pathname==='/api/config')return json(200,{configured:configured(),channels:config.channels,host:config.host,archiveDays:config.archiveDays,dates:virtualDates(),ftpEnabled:process.env.FTP_ENABLED==='true',basePath,publicUrl});
-   const apiToken=tokenMatches(req.headers.authorization);if(req.headers.authorization&&!apiToken)throw failure('Invalid API token.',401,'LOGIN_REQUIRED');
+   const apiToken=tokenMatches(req.headers.authorization);const monitorToken=!!config.monitorToken&&typeof req.headers.authorization==='string'&&req.headers.authorization.length===('Bearer '+config.monitorToken).length&&timingSafeEqual(Buffer.from(req.headers.authorization),Buffer.from('Bearer '+config.monitorToken));
+   if(req.method==='GET'&&['/api/status','/api/cameras'].includes(url.pathname)&&(apiToken||monitorToken))return json(200,url.pathname==='/api/cameras'?{cameras:await cameras()}:{backend:nvrStatus(),exports:{active:manager.active,queued:manager.queue.length,concurrency:manager.concurrent,persistent:!!config.dataDir,storageError:manager.storageError||null},snapshots:{active:snapshots,limit:2}});if(req.headers.authorization&&!apiToken)throw failure('Invalid API token.',401,'LOGIN_REQUIRED');
    if(req.method!=='GET'&&!apiToken&&(!(req.headers.origin==='http://'+req.headers.host||(publicAddress&&req.headers.origin===publicAddress.origin))||req.headers['x-noxis-client']!=='1'))throw failure('Origin not allowed.',403,'ORIGIN');
    let body={};if(req.method==='POST'){if(!String(req.headers['content-type']).startsWith('application/json'))throw failure('JSON body required.',415);let raw='';for await(const chunk of req){raw+=chunk;if(Buffer.byteLength(raw)>262144)throw failure('Request too large.',413);}try{body=JSON.parse(raw||'{}');}catch{throw failure('Invalid JSON.');}}
    const sid=String(req.headers.cookie||'').split(';').map(s=>s.trim()).find(s=>s.startsWith('noxis_session='))?.slice(14);
@@ -57,6 +63,13 @@ export function createApp({basePath=config.basePath,publicUrl=config.publicUrl,m
    if(req.method==='POST'&&url.pathname==='/api/logout'){if(session)for(const c of session.streams)c.abort();sessions.delete(sid);res.setHeader('Set-Cookie',`noxis_session=; HttpOnly; SameSite=Strict; Path=${basePath||'/'}; Max-Age=0${publicAddress?.protocol==='https:'?'; Secure':''}`);return json(200,{ok:true});}
    const client=apiToken?await clientProvider():session?.client;if(!client)throw failure('Connect to the NVR.',401,'LOGIN_REQUIRED');
    if(req.method==='GET'&&url.pathname==='/api/session')return json(200,{ok:true,configured:configured(),channels:config.channels});
+   if(req.method==='GET'&&url.pathname==='/api/cameras')return json(200,{cameras:await cameras()});
+   if(req.method==='GET'&&url.pathname==='/api/status')return json(200,{backend:nvrStatus(),exports:{active:manager.active,queued:manager.queue.length,concurrency:manager.concurrent,persistent:!!config.dataDir,storageError:manager.storageError||null}});
+   const cameraMatch=url.pathname.match(/^\/api\/cameras\/(\d+)(?:\/(snapshot))?$/);
+   if(req.method==='POST'&&cameraMatch){const channel=Number(cameraMatch[1]);if(!Number.isInteger(channel)||channel<1||channel>config.channels)throw failure('Invalid camera.');
+    if(!cameraMatch[2]){if(typeof body.name!=='string'||!body.name.trim()||body.name.length>60)throw failure('Invalid camera name.');return json(200,await renameCamera(channel,body.name.trim()));}
+    if(snapshots>=2)throw failure('Snapshot capacity reached.',429,'SNAPSHOT_BUSY');snapshots++;const controller=new AbortController();res.on('close',()=>controller.abort());try{const image=await takeSnapshot(client,channel,{signal:controller.signal});res.writeHead(200,{'Content-Type':'image/jpeg','Content-Length':image.jpeg.length,'X-Captured-At':image.capturedAt,'X-Camera-Channel':String(channel)});return res.end(image.jpeg);}finally{snapshots--;}
+   }
    if(req.method==='GET'&&url.pathname==='/api/days')return json(200,{dates:virtualDates()});
    if(req.method==='GET'&&url.pathname==='/api/info')return json(200,await client.info());
    if(req.method==='GET'&&url.pathname==='/api/recordings')return json(200,{rows:await client.day(url.searchParams.get('date'))});
@@ -89,4 +102,4 @@ export function createApp({basePath=config.basePath,publicUrl=config.publicUrl,m
  });
  app.on('close',()=>{clearInterval(timer);for(const c of streams)c.abort();sessions.clear();});return app;
 }
-export async function start(){const server=createApp();await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(config.port,config.listen,resolve);});console.log(`Noxis ready on port ${config.port}`);if(process.env.FTP_ENABLED==='true'){const {startFtp}=await import('./ftp.mjs');await startFtp(getConfiguredClient,exportsManager);}return server;}
+export async function start(){const server=createApp();await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(config.port,config.listen,resolve);});console.log(`Noxis ready on port ${config.port}`);if(config.dataDir&&configured()){const resume=()=>getConfiguredClient().catch(()=>{});resume();const recoveryTimer=setInterval(resume,30000);recoveryTimer.unref();server.on('close',()=>clearInterval(recoveryTimer));}if(process.env.FTP_ENABLED==='true'){const {startFtp}=await import('./ftp.mjs');await startFtp(getConfiguredClient,exportsManager);}return server;}

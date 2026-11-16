@@ -1,6 +1,7 @@
+import {config} from './config.mjs';
 import {spawn} from 'node:child_process';
 import {existsSync,openSync,writeSync,closeSync} from 'node:fs';
-import {mkdtemp,unlink,rmdir,readFile} from 'node:fs/promises';
+import {mkdtemp,unlink,rmdir,readFile,mkdir} from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -16,7 +17,7 @@ export function runFFmpeg(args,{signal}={}){
  });
 }
 export async function exportArchive(reader,options,{browser=false,signal}={}){
- const folder=await mkdtemp(path.join(os.tmpdir(),'noxis-'));
+ const cache=config.dataDir?path.join(config.dataDir,'media'):os.tmpdir();await mkdir(cache,{recursive:true});const folder=await mkdtemp(path.join(cache,'noxis-'));
  const videoPath=path.join(folder,'video.raw'),audioPath=path.join(folder,'audio.raw'),output=path.join(folder,'archive.mp4');
  let vfd,afd,codec=null,audioCodec=null,frames=0,firstTime=null,lastTime=null,audioBytes=0,audioFirst=null,reportedFps=25;
  try{
@@ -41,7 +42,7 @@ export async function exportArchive(reader,options,{browser=false,signal}={}){
   if(codec==='H265'&&!browser)args.push('-tag:v','hvc1');
   if(audioBytes)args.push('-c:a','aac','-b:a','64k');
   args.push('-movflags','+faststart',output);
-  options.onAssembling?.();await runFFmpeg(args,{signal});
+  options.onAssembling?.();await runFFmpeg(args,{signal});await unlink(videoPath).catch(()=>{});await unlink(audioPath).catch(()=>{});
   return {file:output,codec,browser,hasAudio:audioBytes>0,stats,dispose:async()=>{for(const file of [videoPath,audioPath,output])await unlink(file).catch(()=>{});await rmdir(folder).catch(()=>{});}};
  }catch(error){if(vfd!==null&&vfd!==undefined)closeSync(vfd);if(afd!==null&&afd!==undefined)closeSync(afd);for(const file of [videoPath,audioPath,output])await unlink(file).catch(()=>{});await rmdir(folder).catch(()=>{});throw error;}
 }

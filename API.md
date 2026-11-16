@@ -64,6 +64,24 @@ First query a day or run a search so its record IDs are available to your authen
 
 États : `queued`, `capturing`, `assembling`, `ready`, `error`, `cancelled`. Les identifiants des tâches sont limités au client authentifié. Les fichiers disparaissent après expiration du cache : recréer une tâche si nécessaire. La liste des dates ne génère aucun export ; seuls les téléchargements créent des médias temporaires.
 
-Batch request / Requête groupée : `{"recordIds":["first-selected-id","second-selected-id"]}`. Only these records are enqueued; there is no automatic selection of a page, day or search result. Two preparations run concurrently, with a bounded queue of 5000 entries. Recordings longer than one hour are split into consecutive export jobs. / Seuls les identifiants explicitement fournis sont traités, jamais les vidéos non cochées.
+Batch request / Requête groupée : `{"recordIds":["first-selected-id","second-selected-id"]}`. Only these records are enqueued; there is no automatic selection of a page, day or search result. `EXPORT_CONCURRENCY` controls parallel preparations (default: 1), with a bounded queue of 5000 entries. Recordings longer than one hour are split into consecutive export jobs. / Seuls les identifiants explicitement fournis sont traités, jamais les vidéos non cochées.
 
 Errors use `{ "error": "message", "code": "ERROR_CODE" }` with an appropriate HTTP status. Codes include `LOGIN_REQUIRED`, `NVR_AUTH`, `NVR_UNREACHABLE`, `DATE_RANGE`, `EXPORT_BUSY`, `EXPORT_RANGE` and `NOT_FOUND`.
+
+
+## Integration 1.2 / Intégration 1.2
+
+`GET /openapi.json` serves the OpenAPI contract without secrets, with the deployment prefix included.
+
+| Method | Path | Result |
+|---|---|---|
+| GET | `/api/cameras` | Shared camera names, 1-based channels and capabilities |
+| POST | `/api/cameras/:channel` | `{name}` updates the shared camera name |
+| POST | `/api/cameras/:channel/snapshot` | `{}` captures one JPEG; `X-Captured-At` identifies capture time |
+| GET | `/api/status` | Last observed NVR contact, export queue, configured concurrency and storage errors; no active probe |
+
+`NOXIS_MONITOR_TOKEN` is a separate optional bearer token restricted to `GET /api/status` and `GET /api/cameras`. It cannot start captures, search recordings or download media. Never give the full service token to a browser or an LLM. ARCADIA applies end-user permissions before calling Noxis.
+
+A snapshot has a 15-second deadline and at most two simultaneous captures. Its connection and decoder close after the first complete JPEG. It does not wait behind archive exports.
+
+Avec `NOXIS_DATA_DIR=/data` et un volume conservé, les noms des caméras et les métadonnées des tâches sont persistants. Après redémarrage, les préparations interrompues sont relancées depuis leur début avec le même identifiant ; les fichiers prêts restent disponibles dans la limite du cache de 30 minutes d’inactivité. La reprise attend une reconnexion au NVR et est retentée périodiquement. Aucun identifiant NVR n’est écrit dans ces métadonnées. Sans répertoire de données, le fonctionnement reste en mémoire. Le cache ne remplace pas une sauvegarde durable des archives.

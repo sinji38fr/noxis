@@ -9,6 +9,8 @@ export function deploymentUri(baseInput='',publicInput=''){
 }
 const uri=deploymentUri(process.env.BASE_PATH||'',process.env.PUBLIC_URL||'');
 export const config={
+ dataDir:process.env.NOXIS_DATA_DIR||'',
+ monitorToken:process.env.NOXIS_MONITOR_TOKEN||'',
  host:process.env.NVR_HOST||'192.0.2.10',httpPort:Number(process.env.NVR_HTTP_PORT||80),videoPort:Number(process.env.NVR_VIDEO_PORT||10000),
  archiveDays:Math.min(3660,Math.max(1,Number(process.env.ARCHIVE_DAYS||30))),channels:Math.min(64,Math.max(1,Number(process.env.NBcam||process.env.NVR_CHANNELS||4))),
  exportConcurrency:Math.min(8,Math.max(1,Math.trunc(Number(process.env.EXPORT_CONCURRENCY)||1))),

@@ -79,3 +79,12 @@ npm start
 Compatibility depends on the NVR firmware. No vendor JavaScript files are needed at runtime. Noxis code is MIT licensed; FFmpeg and dependencies retain their own licenses. [FFmpeg](https://ffmpeg.org/) · [ftp-srv](https://github.com/QuorumDMS/ftp-srv).
 
 Archive filters support multiple camera checkboxes. Exports use readable filenames such as `Cam02_2026-10-31_19-00-00_19-10-25.mp4` (using `TZ`). Completed automatic folder saves show “Saved to folder”. `EXPORT_CONCURRENCY=1` defaults to one simultaneous preparation; Compose accepts values from 1 to 8.
+
+
+## Monitoring and ARCADIA integration (1.2)
+
+Noxis exposes single JPEG snapshots per channel, shared camera names and `/openapi.json`. The separate `NOXIS_MONITOR_TOKEN` only permits cached status and camera catalogue reads. Monitoring can inspect the queue without opening video streams or probing the NVR. `/healthz` checks only the Noxis process.
+
+Compose mounts the `noxis-data` volume at `/data`. Interrupted exports restart from the beginning after a restart, retaining their IDs; ready media remains available until the 30-minute idle cache expires. Preserve the volume and NVR settings on upgrades. `NOXIS_DATA_VOLUME` selects another volume name. Camera names are stored server-side and available to ARCADIA.
+
+ARCADIA enforces per-user, per-camera permissions and keeps the Noxis token server-side. Archive media flows directly between Noxis and ARCADIA. Existing native RTSP relays keep their role; the Noxis live view is still JPEG without audio. See [API.md](API.md).

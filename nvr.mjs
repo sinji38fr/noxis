@@ -1,12 +1,14 @@
 import {randomBytes,createHash} from 'node:crypto';
 import {config,failure,virtualDates} from './config.mjs';
+let lastSuccess=null,lastError=null;
+export const nvrStatus=()=>({lastSuccess,lastError,state:!lastSuccess&&!lastError?'unknown':lastError&&(!lastSuccess||lastError.at>lastSuccess)?'error':'reachable'});
 export class NvrClient{
  constructor(username,password,{target=`http://${config.host}:${config.httpPort}`}={}){this.username=username;this.password=password;this.target=target;this.auth='Basic '+Buffer.from(username+':'+password).toString('base64');this.uid=randomBytes(16).toString('hex');this.records=new Map();this.days=new Map();this.cookie='';}
  async request(endpoint,payload,authenticate=true){
-  let response;try{response=await fetch(this.target+endpoint,{method:payload?'POST':'GET',headers:{...(authenticate?{Authorization:this.auth}:{}),...(this.cookie?{Cookie:this.cookie}:{}),...(payload?{'Content-Type':'application/json'}:{})},body:payload?JSON.stringify(payload):undefined,redirect:'error',signal:AbortSignal.timeout(30000)});}catch{throw failure('NVR unreachable.',502,'NVR_UNREACHABLE');}
-  if([401,403].includes(response.status))throw failure('NVR access denied.',401,'NVR_AUTH');if(!response.ok)throw failure('Unexpected NVR HTTP response.',502,'NVR_RESPONSE');
+  let response;try{response=await fetch(this.target+endpoint,{method:payload?'POST':'GET',headers:{...(authenticate?{Authorization:this.auth}:{}),...(this.cookie?{Cookie:this.cookie}:{}),...(payload?{'Content-Type':'application/json'}:{})},body:payload?JSON.stringify(payload):undefined,redirect:'error',signal:AbortSignal.timeout(30000)});}catch{lastError={at:Date.now(),code:'NVR_UNREACHABLE'};throw failure('NVR unreachable.',502,'NVR_UNREACHABLE');}
+  if(!response.ok){lastError={at:Date.now(),code:[401,403].includes(response.status)?'NVR_AUTH':'NVR_RESPONSE'};throw failure([401,403].includes(response.status)?'NVR access denied.':'Unexpected NVR HTTP response.',[401,403].includes(response.status)?401:502,lastError.code);}
   const cookies=response.headers.getSetCookie?.()||[];if(cookies.length)this.cookie=cookies.map(s=>s.split(';')[0]).join('; ');
-  try{return await response.json();}catch{throw failure('Invalid NVR response.',502,'NVR_RESPONSE');}
+  try{const data=await response.json();lastSuccess=Date.now();return data;}catch{throw failure('Invalid NVR response.',502,'NVR_RESPONSE');}
  }
  async login(){const data=await this.request('/login',{DEV:'XVR',VER:'1.0',Parameter:{username:this.username,passwd:this.password}},false);if(data.status_code!=='ok'||data.status_resson!=='Login success!')throw failure('NVR login failed. Check credentials.',401,'NVR_AUTH');return this;}
  async search(query){

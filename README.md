@@ -123,3 +123,12 @@ Noxis a une couche de protocole dédiée. La compatibilité n’est pas garantie
 Code Noxis : MIT. FFmpeg et les dépendances conservent leurs licences respectives ; FFmpeg est invoqué comme processus séparé. Sources : [FFmpeg](https://ffmpeg.org/), [ftp-srv](https://github.com/QuorumDMS/ftp-srv).
 
 Les filtres Archives permettent de cocher plusieurs caméras. Les exports utilisent des noms lisibles comme `Cam02_2026-10-31_19-00-00_19-10-25.mp4` (fuseau `TZ`). Après une sauvegarde automatique dans le dossier choisi, Noxis affiche « Enregistré dans le dossier ». `EXPORT_CONCURRENCY=1` limite par défaut les préparations simultanées à une ; ce réglage est configurable de 1 à 8 dans Compose.
+
+
+## Intégration Monitoring et ARCADIA (1.2)
+
+Noxis fournit maintenant une photo JPEG unique par canal, un catalogue de caméras avec noms partagés et un contrat OpenAPI sur `/openapi.json`. Le jeton `NOXIS_MONITOR_TOKEN`, distinct de `NOXIS_API_TOKEN`, ne permet que la lecture de l’état et du catalogue. Monitoring peut consulter la file sans ouvrir de flux ni solliciter le NVR. Les derniers contacts du NVR sont horodatés ; `/healthz` reste un test du processus seul.
+
+Compose monte le volume `noxis-data` dans `/data`. Les préparations interrompues sont reprises depuis leur début après redémarrage et les fichiers prêts sont récupérés tant que le cache n’a pas expiré. Garder ce volume et les mêmes paramètres NVR lors des mises à jour. `NOXIS_DATA_VOLUME` permet de nommer un autre volume. Les noms donnés aux caméras sont enregistrés côté serveur et deviennent utilisables par ARCADIA.
+
+ARCADIA est responsable des permissions par utilisateur et par caméra ; son navigateur ne reçoit pas le jeton Noxis. Les archives passent directement de Noxis à ARCADIA, sans relais vidéo dans Monitoring. Le direct Noxis reste une vue JPEG sans audio ; les relais RTSP natifs existants conservent leur rôle. Les routes et paramètres sont décrits dans [API.md](API.md).

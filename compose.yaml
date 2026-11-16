@@ -15,6 +15,8 @@ services:
       NVR_USERNAME: ${NVR_USERNAME:-admin}
       NVR_PASSWORD: ${NVR_PASSWORD:?Set NVR_PASSWORD in .env}
       EXPORT_CONCURRENCY: ${EXPORT_CONCURRENCY:-1}
+      NOXIS_DATA_DIR: /data
+      NOXIS_MONITOR_TOKEN: ${NOXIS_MONITOR_TOKEN:-}
       ARCHIVE_DAYS: ${ARCHIVE_DAYS:-30}
       # Optional reverse-proxy URI, for example https://home.example/noxis/
       PUBLIC_URL: ${PUBLIC_URL:-}
@@ -30,8 +32,14 @@ services:
       ALLOWED_HOSTS: ${ALLOWED_HOSTS:-localhost,127.0.0.1}
       NOXIS_API_TOKEN: ${NOXIS_API_TOKEN:-}
       TZ: ${TZ:-Europe/Paris}
+    volumes:
+      - noxis-data:/data
     read_only: true
     tmpfs:
       - /tmp:size=3g,uid=1000,gid=1000,mode=1700
     security_opt:
       - no-new-privileges:true
+
+volumes:
+  noxis-data:
+    name: ${NOXIS_DATA_VOLUME:-noxis-data}
